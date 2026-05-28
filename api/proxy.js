@@ -15,6 +15,9 @@ export default async function handler(req, res) {
     const { message } = req.body;
     const apiKey = process.env.OPENROUTER_KEY;
 
+    console.log('API Key exists:', !!apiKey);
+    console.log('API Key length:', apiKey ? apiKey.length : 0);
+
     if (!apiKey) {
       console.error('OPENROUTER_KEY not found in environment');
       return res.status(500).json({ error: 'API key not configured on server' });
@@ -42,7 +45,18 @@ export default async function handler(req, res) {
       })
     });
 
-    const data = await response.json();
+    let data;
+    try {
+      data = await response.json();
+    } catch (parseError) {
+      console.error('Failed to parse response:', parseError);
+      const text = await response.text();
+      console.error('Response text:', text);
+      return res.status(500).json({ 
+        error: 'Invalid response from OpenRouter API',
+        details: text.substring(0, 200)
+      });
+    }
 
     if (!response.ok) {
       console.error('OpenRouter error:', data);
