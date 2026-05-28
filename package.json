@@ -1,0 +1,11 @@
+{
+  "name": "swing-trading-platform",
+  "version": "1.0.0",
+  "description": "AI-powered swing trading research platform",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
