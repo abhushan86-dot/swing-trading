@@ -1,4 +1,4 @@
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -15,15 +15,14 @@ export default async function handler(req, res) {
     const { message } = req.body;
     const apiKey = process.env.OPENROUTER_KEY;
 
-    console.log('API Key exists:', !!apiKey);
-    console.log('API Key length:', apiKey ? apiKey.length : 0);
-
     if (!apiKey) {
-      console.error('OPENROUTER_KEY not found in environment');
-      return res.status(500).json({ error: 'API key not configured on server' });
+      console.error('CRITICAL: OPENROUTER_KEY not found in environment');
+      return res.status(500).json({ error: 'API key not configured' });
     }
 
-    console.log('Calling OpenRouter API...');
+    if (!message) {
+      return res.status(400).json({ error: 'Message required' });
+    }
 
     const response = await fetch('https://openrouter.io/api/v1/chat/completions', {
       method: 'POST',
@@ -39,7 +38,7 @@ export default async function handler(req, res) {
         messages: [
           {
             role: 'user',
-            content: `You are a swing trading research assistant. Answer trading questions briefly and directly (2-3 sentences max). Focus on: entry/exit levels, risk/reward ratios, sector themes, catalysts, and supply chain insights.\n\nContext: We track AI Infrastructure, Energy Transition, Memory Shortage, and Cyclical Recovery themes across India, US, and SE Asia markets.\n\nQuestion: ${message}`
+            content: `You are a swing trading research assistant. Answer trading questions briefly and directly (2-3 sentences max).\n\nQuestion: ${message}`
           }
         ]
       })
@@ -47,28 +46,31 @@ export default async function handler(req, res) {
 
     let data;
     try {
-      data = await response.json();
-    } catch (parseError) {
-      console.error('Failed to parse response:', parseError);
       const text = await response.text();
-      console.error('Response text:', text);
+      if (!text) {
+        return res.status(500).json({ error: 'Empty response from OpenRouter API' });
+      }
+      data = JSON.parse(text);
+    } catch (parseError) {
       return res.status(500).json({ 
-        error: 'Invalid response from OpenRouter API',
-        details: text.substring(0, 200)
+        error: 'Failed to parse API response',
+        details: text ? text.substring(0, 100) : 'empty'
       });
     }
 
     if (!response.ok) {
-      console.error('OpenRouter error:', data);
       return res.status(response.status).json({ 
-        error: data.error?.message || 'OpenRouter API error'
+        error: data.error?.message || 'API error'
       });
     }
 
-    const assistantMessage = data.choices[0].message.content;
-    return res.status(200).json({ response: assistantMessage });
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      return res.status(500).json({ error: 'Unexpected API response structure' });
+    }
+
+    return res.status(200).json({ response: data.choices[0].message.content });
+
   } catch (error) {
-    console.error('Proxy error:', error.message);
     return res.status(500).json({ error: `Server error: ${error.message}` });
   }
 }
